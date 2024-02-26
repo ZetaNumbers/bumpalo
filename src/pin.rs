@@ -661,3 +661,38 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use core::mem;
+
+    use super::{Box, Bump};
+
+    #[test]
+    fn use_after_free() {
+        let bump = Bump::new();
+
+        fn register_printing_drop<'a>(bump: &'a Bump, s: &'a str) {
+            struct PrintStringOnDrop<'a>(&'a str);
+
+            impl Drop for PrintStringOnDrop<'_> {
+                fn drop(&mut self) {
+                    println!("After free: {}", self.0);
+                }
+            }
+
+            println!("Before free: {s}");
+            mem::forget(Box::new_in(PrintStringOnDrop(s), bump))
+        }
+
+        {
+            let mut s = "Hello world".to_owned();
+            register_printing_drop(&bump, &s);
+            s.clear();
+            s.push_str("AAAA");
+            // Uncomment this to print "AAAAo world"
+            // drop(bump);
+            drop(s);
+        }
+    }
+}
